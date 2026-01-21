@@ -1,8 +1,10 @@
 package com.albinos.delivery.delivery.tracking.domain.model;
 
+import com.albinos.delivery.delivery.tracking.domain.exception.DomainException;
 import lombok.*;
 
 import java.math.BigDecimal;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -75,6 +77,33 @@ public class Delivery {
         calculateTotalItems();
     }
 
+    public void editPreparationDetails(PreparationDetails details) {
+        verifyIfCanBeEdited();
+        setSender(details.getSender());
+        setRecipient(details.getRecipient());
+        setDistanceFee(details.getDistanceFee());
+        setCourierPayout(details.getCourierPayout());
+        setExpectedDeliveryAt(OffsetDateTime.now().plus(details.getExpectedDeliveryTime()));
+        setTotalCost(this.getDistanceFee().add(this.getCourierPayout()));
+    }
+
+    public void place(){
+        verifyIfCanBePlaced();
+        this.setStatus(DeliveryStatus.WAITING_FOR_COURIER);
+        this.setPlacedAt(OffsetDateTime.now());
+    }
+
+    public void pickUp(UUID courierId){
+        this.setCourierId(courierId);
+        this.setStatus(DeliveryStatus.IN_TRANSIT);
+        this.setPlacedAt(OffsetDateTime.now());
+    }
+
+    public void markAsDelivered(){
+        this.setStatus(DeliveryStatus.DELIVERY);
+        this.setFulfilledAt(OffsetDateTime.now());
+    }
+
     public List<Item> getItems() {
         return Collections.unmodifiableList(this.items);
     }
@@ -82,5 +111,38 @@ public class Delivery {
     private void calculateTotalItems(){
         int totalItems = items.stream().mapToInt(Item::getQuantity).sum();
         setTotalItems(totalItems);
+    }
+
+    private void verifyIfCanBePlaced() {
+        if(!isFilled()){
+            throw new DomainException();
+        }
+        if(!getStatus().equals(DeliveryStatus.DRAFT)){
+            throw new DomainException();
+        }
+    }
+
+    private void verifyIfCanBeEdited() {
+        if(!getStatus().equals(DeliveryStatus.DRAFT)){
+            throw new DomainException();
+        }
+    }
+
+    private boolean isFilled() {
+        return this.getSender() != null
+                && this.getRecipient() != null
+                && this.getTotalCost() != null;
+    }
+
+    @Getter
+    @AllArgsConstructor
+    @Builder
+    public static class PreparationDetails{
+        private ContactPoint sender;
+        private ContactPoint recipient;
+        private BigDecimal distanceFee;
+        private BigDecimal courierPayout;
+        private BigDecimal expectedDeliveryAt;
+        private Duration expectedDeliveryTime;
     }
 }
