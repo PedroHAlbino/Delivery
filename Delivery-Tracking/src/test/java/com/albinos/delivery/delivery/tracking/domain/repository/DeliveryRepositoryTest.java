@@ -1,26 +1,39 @@
-package com.albinos.delivery.delivery.tracking.domain.model;
+package com.albinos.delivery.delivery.tracking.domain.repository;
 
-import com.albinos.delivery.delivery.tracking.domain.exception.DomainException;
+import com.albinos.delivery.delivery.tracking.domain.model.ContactPoint;
+import com.albinos.delivery.delivery.tracking.domain.model.Delivery;
 import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.jdbc.AutoConfigureTestDatabase;
+import org.springframework.boot.test.autoconfigure.orm.jpa.DataJpaTest;
 
 import java.math.BigDecimal;
 import java.time.Duration;
 
 import static org.junit.jupiter.api.Assertions.*;
 
-class DeliveryTest {
+@DataJpaTest
+@AutoConfigureTestDatabase(replace = AutoConfigureTestDatabase.Replace.NONE)
+class DeliveryRepositoryTest {
 
+    @Autowired
+    private DeliveryRepository deliveryRepository;
 
     @Test
-    public void shouldChangeStatusToPlaced(){
+    public void shouldPersist(){
         Delivery delivery = Delivery.draft();
 
         delivery.editPreparationDetails(createdValidPreparationDetails());
 
-        delivery.place();
+        delivery.addItem("Computador", 2);
+        delivery.addItem("Notebook", 3);
 
-        assertEquals(DeliveryStatus.WAITING_FOR_COURIER, delivery.getStatus());
-        assertNotNull(delivery.getPlacedAt());
+        deliveryRepository.saveAndFlush(delivery);
+
+        Delivery persistendDelivery = deliveryRepository.findById(delivery.getId()).orElseThrow();
+
+        assertEquals(2, persistendDelivery.getItems().size());
+
     }
 
     private Delivery.PreparationDetails createdValidPreparationDetails() {
@@ -43,7 +56,7 @@ class DeliveryTest {
                 .phone("(81) 99999-9999")
                 .build();
 
-        return Delivery.PreparationDetails.builder()
+        return com.albinos.delivery.delivery.tracking.domain.model.Delivery.PreparationDetails.builder()
                 .sender(sender)
                 .recipient(recipient)
                 .distanceFee(new BigDecimal("15.00"))
@@ -51,15 +64,4 @@ class DeliveryTest {
                 .expectedDeliveryTime(Duration.ofHours(5))
                 .build();
     }
-
-    @Test
-    public void shouldNotPlace(){
-        Delivery delivery = Delivery.draft();
-        assertThrows(DomainException.class, () -> {
-            delivery.place();
-        });
-        assertEquals(DeliveryStatus.DRAFT, delivery.getStatus());
-        assertNull(delivery.getPlacedAt());
-    }
-
 }
